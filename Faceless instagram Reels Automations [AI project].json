@@ -1,0 +1,331 @@
+{
+  "name": "Faceless instagram Reels Automations",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "05610138-fa80-4169-a7f8-e9322686c2f8"
+    },
+    {
+      "parameters": {
+        "url": "https://api.pexels.com/videos/search",
+        "options": {},
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "ODjAzwk1fKSqkRYUP5JpPjOad1PAOqlMl4L8MlczmyVCGkI0ManVbXiL"
+            }
+          ]
+        },
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "query",
+              "value": "={{\n  (() => {\n    const prompts = [\n      // existing faceless prompts\n      'faceless storytelling',\n      'faceless montage',\n      'faceless b-roll',\n      'hands only',\n      'no face',\n      'anonymous person',\n      'faceless POV',\n      'faceless street',\n      'faceless lifestyle',\n      'faceless cinematic',\n      'faceless travel',\n      'faceless city walk',\n      'faceless nature walk',\n      'faceless coffee aesthetic',\n      'faceless study desk',\n      'faceless morning routine',\n      'faceless workout',\n      'faceless fashion',\n      'faceless night lights',\n      'faceless cooking',\n\n      // existing nature scene prompts\n      'mountain sunrise',\n      'ocean waves',\n      'forest walk',\n      'river flowing',\n      'sunset sky',\n      'rain on leaves',\n      'snowy landscape',\n      'desert dunes',\n      'starry night sky',\n      'tropical beach',\n      'waterfall closeup',\n      'meadow flowers',\n      'foggy morning',\n      'thunderstorm clouds',\n      'lake reflections',\n\n      // new nature prompts\n      'autumn forest',\n      'spring blossoms',\n      'misty mountains',\n      'pine forest',\n      'wildflower field',\n      'rocky coastline',\n      'countryside sunrise',\n      'lush valley',\n      'cascading stream',\n      'sunlit meadow'\n    ];\n    return prompts[Math.floor(Math.random() * prompts.length)];\n  })()\n}}"
+            },
+            {
+              "name": "per_page",
+              "value": "15"
+            },
+            {
+              "name": "page",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "name": "Pexels Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "226984f2-57d1-460a-ba35-df04b2c55b49"
+    },
+    {
+      "parameters": {
+        "functionCode": "/* Pick a random clip from Pexels result and generate caption/hashtags */\nconst videos = $json.videos || [];\nif (!videos || videos.length === 0) {\n  throw new Error('No videos returned from Pexels.');\n}\n\n// Choose a random index from the list\nconst randomIndex = Math.floor(Math.random() * videos.length);\nconst chosen = videos[randomIndex];\n\n// Pick the best quality file (prefer ≥720px width)\nconst best = chosen.video_files.find(f => f.width >= 720) || chosen.video_files[0];\n\n// Get the keyword/query used\nconst chosenQuery = ($json.query && $json.query.toString().trim())\n  || ($node && $node[\"Pexels Search\"] && $node[\"Pexels Search\"].json && $node[\"Pexels Search\"].json.query)\n  || 'faceless';\n\n// Helper: turn a phrase into hashtags\nfunction toHashtags(text) {\n  return text.toString()\n    .toLowerCase()\n    .replace(/[^a-z0-9\\s]/g, '')   // remove punctuation\n    .split(/\\s+/)\n    .filter(Boolean)\n    .slice(0, 3)                   // take up to 3 words\n    .map(w => `#${w}`)\n    .join(' ');\n}\n\n// Build caption\nconst title = `Faceless ${chosenQuery} Reel`;\nconst tagsFromQuery = toHashtags(chosenQuery);\nconst extraTags = '#faceless #reels #aesthetic';\nconst cta = '▶️ Watch till the end';\nconst caption = `${title}\\n\\n${tagsFromQuery} ${extraTags}\\n\\n${cta}`.trim();\n\n// --- Audio options (Cloudinary public_ids) ---\nconst audioOptions = [\n  'sandbreaker-379630_bgmvgk',\n  'vlog-beat-background-349853_vnqa0d',\n  'deep-abstract-ambient_snowcap-401656_d9clqo',\n  'running-night-393139_yyqr5v',\n  'alone-296348_frgjib'\n];\nconst chosenAudio = audioOptions[Math.floor(Math.random() * audioOptions.length)];\n\nreturn [{\n  json: {\n    clip_url: best.link,\n    caption: caption,\n    overlayText: chosen.alt || chosen.description || title,\n    pexels_id: chosen.id,\n    chosen_query: chosenQuery,\n    audio_public_id: chosenAudio   // <== so next step (Cloudinary transform) can use it\n  }\n}];\n\n"
+      },
+      "name": "Pick Clip",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ],
+      "id": "03d92049-cde8-4b92-8222-7a53a2dfe61d"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.cloudinary.com/v1_1/dggnbggv3/video/upload",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "file",
+              "value": "={{$json.clip_url}}"
+            },
+            {
+              "name": "upload_preset",
+              "value": "n8n_faceless_reels"
+            }
+          ]
+        }
+      },
+      "name": "Cloudinary Upload (remote fetch)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        0
+      ],
+      "id": "a68eb5ae-fb4d-4c5b-9db8-8db9debd6e17"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Build Transform URL - Function node (Option A: Cloudinary-only, force audio apply)\n// Tries transcription via endpoint, falls back to random subtitle.\n// Adds fl_layer_apply + e_volume and an optional vertical crop for Reels.\n\nconst res = $input.item.json || {};\nconst cloudName = 'dggnbggv3';\nconst videoPublicId = res.public_id || null;\n\n// --- Audio options (your sound assets) ---\nconst audioOptions = [\n  'sandbreaker-379630_bgmvgk',\n  'vlog-beat-background-349853_vnqa0d',\n  'deep-abstract-ambient_snowcap-401656_d9clqo',\n  'running-night-393139_yyqr5v',\n  'alone-296348_frgjib'\n];\nconst audioPublicId = audioOptions[Math.floor(Math.random() * audioOptions.length)];\n\n// Subtitle options (kept)\nconst subtitleOptions = [\n  \"Not every silence is empty.\",\n  \"Behind every glance is a story untold.\",\n  \"My thoughts speak louder than words.\",\n  \"The heart whispers what the lips can’t say.\",\n  \"Every night ends with a sunrise.\",\n  \"Healing isn’t loud, it’s steady.\",\n  \"Small steps still move forward.\",\n  \"The city lights remind me I’m not alone.\",\n  \"Raindrops are just the sky’s way of breathing.\",\n  \"Fall seven times, stand up eight.\",\n  \"Even broken crayons can color.\",\n  \"Your vibe attracts your tribe.\",\n  \"It’s okay not to be okay.\",\n  \"Mountains remind me how small worries are.\",\n  \"Waves don’t ask permission to crash, they just do.\",\n  \"A sunset is proof that endings can be beautiful.\",\n  \"Books and late nights build quiet empires.\",\n  \"Study desks tell more about dreams than people do.\",\n  \"Coffee stains and memories last longer than trends.\",\n  \"My peace starts where my phone ends.\",\n  \"Read this twice if it feels true.\",\n  \"Maybe this reel found you for a reason.\"\n];\n\n// (your fetchTranscript helper and rest of original code unchanged)...\nasync function fetchTranscript(videoId) {\n  try {\n    const endpoint = 'https://your-transcribe-service.example.com/transcribe'; // <- replace\n    const payload = { cloudinary_public_id: videoId, cloud_name: cloudName };\n    const r = await fetch(endpoint, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify(payload),\n    });\n    if (!r.ok) return null;\n    const j = await r.json();\n    if (j && j.text && typeof j.text === 'string' && j.text.trim().length > 0) {\n      const short = j.text.trim().split('\\n').join(' ').replace(/\\s+/g,' ').slice(0,120);\n      return short;\n    }\n    return null;\n  } catch (e) {\n    return null;\n  }\n}\n\nreturn (async () => {\n  let subtitleText = null;\n\n  if (videoPublicId && typeof fetch === 'function') {\n    try {\n      subtitleText = await fetchTranscript(videoPublicId);\n    } catch (e) {\n      subtitleText = null;\n    }\n  }\n\n  if (!subtitleText) {\n    subtitleText = subtitleOptions[Math.floor(Math.random() * subtitleOptions.length)];\n  }\n\n  const fonts = [\"Arial\", \"Courier\", \"Times\", \"Montserrat\"];\n  const colors = [\"FFFFFF\", \"FFD700\", \"00FFCC\", \"FF69B4\"];\n  const positions = [\"g_south,y_60\", \"g_north,y_60\", \"g_center\"];\n  const font = fonts[Math.floor(Math.random() * fonts.length)];\n  const color = colors[Math.floor(Math.random() * colors.length)];\n  const position = positions[Math.floor(Math.random() * positions.length)];\n\n  const encode = (txt) => encodeURIComponent(txt);\n\n  if (videoPublicId && audioPublicId) {\n    // TRANSFORM NOTES:\n    // - c_fill,ar_9:16,w_720 -> optional vertical crop for Reels (remove if not needed)\n    // - l_audio:... -> add audio layer\n    // - fl_layer_apply -> force the overlay application\n    // - e_volume:200 -> boost volume for testing (reduce later)\n    // - l_text:... -> subtitle overlay (URL-encoded)\n    const cropForReel = 'c_fill,ar_9:16,w_720/'; // change to '' if you don't want a forced vertical crop\n    const audioLayer = `l_audio:${audioPublicId},fl_layer_apply,e_volume:200`;\n    const textLayer = `l_text:${font}_40_bold:${encode(subtitleText)},co_rgb:${color},${position}`;\n\n    const overlayUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${cropForReel}${audioLayer},${textLayer}/${videoPublicId}.mp4`;\n\n    return [{\n      json: {\n        transformed_url: overlayUrl,\n        caption: subtitleText,\n        public_id: videoPublicId,\n        audio_public_id: audioPublicId,\n        subtitle: subtitleText,\n        font: font,\n        color: color,\n        position: position\n      }\n    }];\n  }\n\n  throw new Error('Missing video or audio public_id');\n})();\n\n"
+      },
+      "name": "Build Transform URL",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1872,
+        0
+      ],
+      "id": "aa2b3260-e160-4560-8c81-0d8e816129f8"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://graph.facebook.com/v23.0/17841453555357331/media\n\n\n\n\n",
+        "options": {
+          "bodyContentType": "multipart-form-data"
+        },
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "media_type",
+              "value": "REELS"
+            },
+            {
+              "name": "video_url",
+              "value": "={{$node[\"Build Transform URL\"].json[\"transformed_url\"]}}\n"
+            },
+            {
+              "name": "caption",
+              "value": "={{$node[\"Pick Clip\"].json[\"caption\"]}}\n\n"
+            },
+            {
+              "name": "access_token",
+              "value": "EAAbkTZC0auf0BPrM7u0ZAea1oXzW5T5fZAzhOnCjPVLVVV1jE0zNQqCsn7ow1KgE8tZA9UFBZAxwKZBg5kJAUkgUeTZCTtVzfEJmtavOyF3hQrH4GN3bySGZCIZBmcDG3EBKc7zI8SO4CDBQBaYmJdsngLVC4KXqvn9F1QbapQ9qG8AFGJy3eR2JN8KW4PJ0JaeCPsqZBCo1UIZBr9Poy3BRaRATwD0vuPtk7Kt"
+            }
+          ]
+        }
+      },
+      "name": "IG Create Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        0
+      ],
+      "id": "b621fef7-5c85-4fd9-83a0-79599a25c951"
+    },
+    {
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "name": "Wait 15s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        2864,
+        0
+      ],
+      "id": "2707a5c9-7cdf-4475-bfbc-7e1ebd797587",
+      "webhookId": "90e7c93c-59dc-4aca-8ad4-cf24e530b1f8"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://graph.facebook.com/v23.0/17841453555357331/media_publish\n\n\n",
+        "options": {
+          "bodyContentType": "form-urlencoded"
+        },
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "creation_id",
+              "value": "={{$node[\"IG Create Media\"].json[\"id\"]}}\n\n"
+            },
+            {
+              "name": "access_token",
+              "value": "EAAbkTZC0auf0BPrM7u0ZAea1oXzW5T5fZAzhOnCjPVLVVV1jE0zNQqCsn7ow1KgE8tZA9UFBZAxwKZBg5kJAUkgUeTZCTtVzfEJmtavOyF3hQrH4GN3bySGZCIZBmcDG3EBKc7zI8SO4CDBQBaYmJdsngLVC4KXqvn9F1QbapQ9qG8AFGJy3eR2JN8KW4PJ0JaeCPsqZBCo1UIZBr9Poy3BRaRATwD0vuPtk7Kt"
+            }
+          ]
+        }
+      },
+      "name": "IG Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        3296,
+        0
+      ],
+      "id": "667d9e02-ee60-463d-b915-8ae408bf5397"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"name\": \"Extract Permalink\",\n  \"type\": \"n8n-nodes-base.set\",\n  \"typeVersion\": 1,\n  \"position\": [2720, 250],\n  \"parameters\": {\n    \"keepOnlySet\": true,\n    \"values\": {\n      \"string\": [\n        {\n          \"name\": \"permalink_url\",\n          \"value\": \"=$(\\\"peramlink\\\").item.json.permalink_url\"\n        }\n      ]\n    }\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4304,
+        16
+      ],
+      "id": "1e94072b-77ff-42d7-8caa-55e8138c51ac",
+      "name": "extract permalink"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"name\": \"Extract Permalink\",\n  \"type\": \"n8n-nodes-base.set\",\n  \"typeVersion\": 1,\n  \"position\": [2720, 250],\n  \"parameters\": {\n    \"keepOnlySet\": true,\n    \"values\": {\n      \"string\": [\n        {\n          \"name\": \"permalink_url\",\n          \"value\": \"=$(\\\"peramlink\\\").item.json.permalink_url\"\n        }\n      ]\n    }\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3776,
+        16
+      ],
+      "id": "8d561a5f-f591-423d-9395-bccee624c14e",
+      "name": "permalink"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Pexels Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pexels Search": {
+      "main": [
+        [
+          {
+            "node": "Pick Clip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Clip": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary Upload (remote fetch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudinary Upload (remote fetch)": {
+      "main": [
+        [
+          {
+            "node": "Build Transform URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Transform URL": {
+      "main": [
+        [
+          {
+            "node": "IG Create Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG Create Media": {
+      "main": [
+        [
+          {
+            "node": "Wait 15s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 15s": {
+      "main": [
+        [
+          {
+            "node": "IG Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG Publish": {
+      "main": [
+        [
+          {
+            "node": "permalink",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "permalink": {
+      "main": [
+        [
+          {
+            "node": "extract permalink",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "04059a2f-181f-4b13-831a-6ca29ce62df2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "213033e132ae74ea35110fb96458e73acf53b88200805b2866061a6a8c3a43eb"
+  },
+  "id": "CcC9XQjBjtzL0MPQ",
+  "tags": []
+}
