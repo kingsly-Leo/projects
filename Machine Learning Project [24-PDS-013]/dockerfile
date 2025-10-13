@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY app.py airline.py ./
+COPY rf_model.pkl label_encoders.pkl scaler.pkl ./
+COPY templates.zip static.zip ./
+
+RUN mkdir -p templates static \
+ && unzip -o templates.zip -d templates \
+ && unzip -o static.zip -d static \
+ && rm -f templates.zip static.zip
+
+EXPOSE 8000
+CMD ["gunicorn", "-w", "2", "-k", "gthread", "-b", "0.0.0.0:8000", "app:app", "--timeout", "120"]
